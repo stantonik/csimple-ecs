@@ -16,13 +16,14 @@ extern "C" {
 //------------------------------------------------------------------------------
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
 
 //------------------------------------------------------------------------------
 // Macros
 //------------------------------------------------------------------------------
 #define ECS_MAX_COMPONENTS 32
 
-#define ecs_register_compoenent(component) ({ ecs_register_component_by_desc(#component, sizeof(component)); })
+#define ecs_register_component(component) ({ ecs_register_component_by_name(#component, sizeof(component)); })
 
 #define ecs_add_component(entity, component, default_value) ({ sizeof(component), ecs_add_component_by_name(entity, #component, (void *)(default_value)); })
 

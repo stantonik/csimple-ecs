@@ -33,9 +33,10 @@ typedef struct {
 extern int vector_init(vector_t *vec, size_t element_size, int initial_capacity);
 extern int vector_resize(vector_t *vec);
 extern int vector_shrink(vector_t *vec);
-extern int vector_add_element(vector_t *vec, void *element);
-extern void vector_get_element(vector_t *vec, int index, void **out_element);
-extern void vector_remove_element(vector_t *vec, int index);
+extern int vector_push_back(vector_t *vec, void *element);
+extern void vector_get(vector_t *vec, int index, void **out_element);
+extern void vector_get_cpy(vector_t *vec, int index, void *out_element);
+extern void vector_remove_ind(vector_t *vec, int index);
 extern void vector_free(vector_t *vec);
 
 #ifdef __cplusplus

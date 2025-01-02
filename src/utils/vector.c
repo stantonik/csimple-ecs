@@ -60,7 +60,7 @@ int vector_shrink(vector_t *vec)
     return 0;
 }
 
-int vector_add_element(vector_t *vec, void *element)
+int vector_push_back(vector_t *vec, void *element)
 {
     if (vec->size == vec->capacity)
     {
@@ -82,12 +82,17 @@ int vector_add_element(vector_t *vec, void *element)
     return 0;
 }
 
-inline void vector_get_element(vector_t *vec, int index, void **out_element)
+inline void vector_get(vector_t *vec, int index, void **out_element)
 {
     *out_element = vec->array[index];
 }
 
-void vector_remove_element(vector_t *vec, int index)
+inline void vector_get_cpy(vector_t *vec, int index, void *out_element)
+{
+    memcpy(out_element, vec->array[index], vec->element_size);
+}
+
+void vector_remove_ind(vector_t *vec, int index)
 {
     if (vec->size == 0) 
     {
@@ -112,4 +117,8 @@ void vector_free(vector_t *vec)
     }
 
     free(vec->array);
+
+    vec->element_size = 0;
+    vec->size = 0;
+    vec->capacity = 0;
 }
