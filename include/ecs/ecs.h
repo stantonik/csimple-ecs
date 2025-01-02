@@ -30,9 +30,15 @@ extern "C" {
 
 #define ecs_remove_component(entity, component) {( sizeof(component), ecs_remove_component_by_name(entity, #component)); })
 
-#define ecs_create_signature(signature, ...) ({ ecs_create_signature_by_names(signature, #__VA_ARGS__); })
+#define ecs_create_signature(signature, ...) ({ \
+        ecs_system_t validators[] = { __VA_ARGS__ }; \
+        (void)validators; \
+        ecs_create_signature_by_names(signature, #__VA_ARGS__); \
+        })
 
-/* #define ecs_register_system(system, event, signature, args) ({ ecs_register_system_fn(#system, system, event, signature, args); }) */
+#define ecs_register_system(system, event, signature) ({ (void)system, ecs_register_system_by_name(#system, system, event, signature); })
+
+#define ecs_set_system_parameters(system, args) ({ (void)system, ecs_set_system_parameters_by_name(#system, args); })
 
 #define ecs_system_call(system, ret) ({ (void)system, ecs_system_call_by_name(#system, ret); })
 
@@ -49,6 +55,7 @@ extern "C" {
 typedef int ecs_err_t;
 typedef uint32_t ecs_entity_t;
 typedef uint32_t ecs_signature_t;
+typedef void (*ecs_system_t)(ecs_entity_t *, void *args);
 
 typedef enum 
 {
@@ -80,8 +87,9 @@ extern ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name
 
 extern ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *names);
 
-extern ecs_err_t ecs_register_system_by_name(const char *name);
+extern ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event);
 extern ecs_err_t ecs_unregister_system_by_name(const char *name);
+extern ecs_err_t ecs_set_system_parameters_by_name(const char *name, void *args);
 extern ecs_err_t ecs_system_call_by_name(const char *name);
 extern ecs_err_t ecs_system_listen(ecs_system_event_t event);
 extern ecs_err_t ecs_system_get_return_state_by_name(const char *name, ecs_err_t *ret);
