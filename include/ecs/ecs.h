@@ -86,7 +86,7 @@ extern ecs_err_t ecs_delete_entity(ecs_entity_t entity);
 extern ecs_err_t ecs_register_component_by_name(const char *name, size_t size);
 extern ecs_err_t ecs_unregister_component_by_name(const char *name);
 extern ecs_err_t ecs_add_component_by_name(ecs_entity_t entity, const char *name, void *default_value);
-extern ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name);
+extern inline ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name);
 extern ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void **dest);
 
 extern ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *names);

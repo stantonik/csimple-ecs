@@ -78,6 +78,8 @@ int main(void)
 
     ecs_listen_systems(ECS_SYSTEM_ON_INIT);
 
+    /* ecs_delete_entity(player); */
+
     for (int i = 0; i < 10; ++i)
     {
         ecs_listen_systems(ECS_SYSTEM_ON_UPDATE);

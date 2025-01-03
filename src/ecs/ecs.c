@@ -86,6 +86,7 @@ static scene_info_t *cs = NULL;
 //------------------------------------------------------------------------------
 // Function Prototypes
 //------------------------------------------------------------------------------
+static ecs_err_t remove_component_by_index(ecs_entity_t entity, uint8_t index);
 
 //------------------------------------------------------------------------------
 // Function Implementations
@@ -286,13 +287,24 @@ ecs_err_t ecs_delete_entity(ecs_entity_t entity)
         return ECS_ERR_NULL;
     }
 
+    entity_info_t *del_entity_info;
+    vector_get(&cs->entities, del_entity_ind, (void **)&del_entity_info);
+
+    // Remove all components from entity
+    for (int i = 0; i < ECS_MAX_COMPONENTS; ++i)
+    {
+        remove_component_by_index(entity, i);
+    }
+
+    // Edit mappings
+    entity_info_t *last_entity_info;
+    vector_get(&cs->entities, cs->entities.size - 1, (void **)&last_entity_info);
+    itoi_map_remove(&cs->entity_to_index_map, last_entity_info->entity);
+    itoi_map_insert(&cs->entity_to_index_map, last_entity_info->entity, del_entity_ind);
+
     vector_remove(&cs->entities, del_entity_ind);
     itoi_map_remove(&cs->entity_to_index_map, entity);
     vector_push_back(&cs->recycled_entities, &entity);
-
-    // TODO: edit mappings
-
-    // TODO: remove entity from the systems
 
     return ECS_OK;
 }
@@ -352,11 +364,10 @@ ecs_err_t ecs_add_component_by_name(ecs_entity_t entity, const char *name, void 
     return ECS_OK;
 }
 
-ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
+ecs_err_t remove_component_by_index(ecs_entity_t entity, uint8_t index)
 {
-    int entity_ind, comp_info_ind;
-    if (!itoi_map_get(&cs->entity_to_index_map, entity, &entity_ind) || 
-            !stoi_map_get(&cs->component_name_to_index_map, name, &comp_info_ind)) 
+    int entity_ind;
+    if (!itoi_map_get(&cs->entity_to_index_map, entity, &entity_ind))
     {
         return ECS_ERR_NULL;
     }
@@ -365,13 +376,13 @@ ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
     vector_get(&cs->entities, entity_ind, (void **)&entity_info);
 
     // Check if entity has the component
-    if (!(entity_info->signature & (1 << comp_info_ind)))
+    if (!(entity_info->signature & (1 << index)))
     {
         return ECS_ERR_NULL;
     }
 
     // Remove component from component array
-    component_info_t *comp_info = &cs->components[comp_info_ind];
+    component_info_t *comp_info = &cs->components[index];
     int del_comp_id;
     itoi_map_get(&comp_info->entity_to_index_map, entity, &del_comp_id);
     vector_remove(&comp_info->array, del_comp_id);
@@ -392,6 +403,17 @@ ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
     }
 
     return ECS_OK;
+}
+
+inline ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
+{
+    int comp_info_ind;
+    if (!stoi_map_get(&cs->component_name_to_index_map, name, &comp_info_ind)) 
+    {
+        return ECS_ERR_NULL;
+    }
+
+    return remove_component_by_index(entity, comp_info_ind);
 }
 
 ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void **dest)
