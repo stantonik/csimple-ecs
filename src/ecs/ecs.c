@@ -46,8 +46,7 @@ typedef struct
     ecs_signature_t signature;
     ecs_system_event_t event;
 
-    vector_t pentities;
-    int entity_count;
+    vector_t entities;
 } system_info_t;
 
 //------------------------------------------------------------------------------
@@ -68,7 +67,10 @@ static stoi_map_t component_name_to_index_map;
 
 static vector_t systems;
 static stoi_map_t system_name_to_index_map;
-static itoi_map_t event_to_system_index_map;
+
+static vector_t on_init_system_indices;
+static vector_t on_update_system_indices;
+static vector_t on_end_system_indices;
 
 //------------------------------------------------------------------------------
 // Function Prototypes
@@ -89,7 +91,11 @@ ecs_err_t ecs_init()
     ret |= components == NULL;
     ret |= vector_init(&entities, sizeof(entity_info_t), 1);
     ret |= vector_init(&recycled_entities, sizeof(ecs_entity_t), 1);
+
     ret |= vector_init(&systems, sizeof(system_info_t), 1);
+    ret |= vector_init(&on_init_system_indices, sizeof(int), 1);
+    ret |= vector_init(&on_update_system_indices, sizeof(int), 1);
+    ret |= vector_init(&on_end_system_indices, sizeof(int), 1);
     if (ret != ECS_OK)
     {
         return ECS_ERR_MEM;
@@ -98,7 +104,6 @@ ecs_err_t ecs_init()
     stoi_map_init(&component_name_to_index_map);
     stoi_map_init(&system_name_to_index_map);
     itoi_map_init(&entity_to_index_map);
-    itoi_map_init(&event_to_system_index_map);
 
     return ECS_OK;
 }
@@ -121,14 +126,16 @@ ecs_err_t ecs_terminate()
     {
         system_info_t *sys;
         vector_get(&systems, i, (void **)&sys);
-        vector_free(&sys->pentities);
+        vector_free(&sys->entities);
     }
     vector_free(&systems);
+    vector_free(&on_init_system_indices);
+    vector_free(&on_update_system_indices);
+    vector_free(&on_end_system_indices);
 
     stoi_map_destroy(&component_name_to_index_map);
     stoi_map_destroy(&system_name_to_index_map);
     itoi_map_destroy(&entity_to_index_map);
-    itoi_map_destroy(&event_to_system_index_map);
 
     return ECS_OK;
 }
@@ -166,10 +173,12 @@ ecs_err_t ecs_unregister_component_by_name(const char *name)
     }
 
     component_info_t *comp_info = &components[comp_info_ind];
-    
+
     vector_free(&comp_info->array);
     itoi_map_destroy(&comp_info->entity_to_index_map);
     itoi_map_destroy(&comp_info->index_to_entity_map);
+
+    // TODO: edit mapping for the last component type
 
     stoi_map_remove(&component_name_to_index_map, name);
 
@@ -187,20 +196,20 @@ ecs_err_t ecs_unregister_component_by_name(const char *name)
 
 ecs_err_t ecs_create_entity(ecs_entity_t *entity)
 {
-    ecs_entity_t nentity;
+    entity_info_t nentity = {  };
     if (recycled_entities.size > 0)
     {
-        vector_get_cpy(&recycled_entities, 0, &nentity);
-        vector_remove_ind(&recycled_entities, 0);
+        vector_get_copy(&recycled_entities, 0, &nentity.entity);
+        vector_remove(&recycled_entities, 0);
     }
     else
     {
-        nentity = next_entities++;
+        nentity.entity = next_entities++;
     }
 
     vector_push_back(&entities, &nentity);
-    itoi_map_insert(&entity_to_index_map, nentity, entities.size - 1);
-    *entity = nentity;
+    itoi_map_insert(&entity_to_index_map, nentity.entity, entities.size - 1);
+    *entity = nentity.entity;
 
     return ECS_OK;
 }
@@ -213,7 +222,7 @@ ecs_err_t ecs_delete_entity(ecs_entity_t entity)
         return ECS_ERR_NULL;
     }
 
-    vector_remove_ind(&entities, del_entity_ind);
+    vector_remove(&entities, del_entity_ind);
     itoi_map_remove(&entity_to_index_map, entity);
     vector_push_back(&recycled_entities, &entity);
 
@@ -224,7 +233,7 @@ ecs_err_t ecs_add_component_by_name(ecs_entity_t entity, const char *name, void 
 {
     int entity_ind, comp_info_ind;
     if (!itoi_map_get(&entity_to_index_map, entity, &entity_ind) || 
-        !stoi_map_get(&component_name_to_index_map, name, &comp_info_ind)) 
+            !stoi_map_get(&component_name_to_index_map, name, &comp_info_ind)) 
     {
         return ECS_ERR_NULL;
     }
@@ -268,7 +277,7 @@ ecs_err_t ecs_add_component_by_name(ecs_entity_t entity, const char *name, void 
         vector_get(&systems, i, (void **)&sys_info);
         if (sys_info->signature == entity_info->signature)
         {
-            vector_push_back(&sys_info->pentities, &entity);
+            vector_push_back(&sys_info->entities, &entity);
         }
     }
 
@@ -279,7 +288,7 @@ ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
 {
     int entity_ind, comp_info_ind;
     if (!itoi_map_get(&entity_to_index_map, entity, &entity_ind) || 
-        !stoi_map_get(&component_name_to_index_map, name, &comp_info_ind)) 
+            !stoi_map_get(&component_name_to_index_map, name, &comp_info_ind)) 
     {
         return ECS_ERR_NULL;
     }
@@ -297,7 +306,7 @@ ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
     component_info_t *comp_info = &components[comp_info_ind];
     int del_comp_id;
     itoi_map_get(&comp_info->entity_to_index_map, entity, &del_comp_id);
-    vector_remove_ind(&comp_info->array, del_comp_id);
+    vector_remove(&comp_info->array, del_comp_id);
 
     // Edit mappings
     itoi_map_remove(&comp_info->entity_to_index_map, entity);
@@ -310,7 +319,7 @@ ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name)
         vector_get(&systems, i, (void **)&sys_info);
         if (sys_info->signature == entity_info->signature)
         {
-            vector_remove_ind(&sys_info->pentities, i);
+            vector_remove(&sys_info->entities, i);
         }
     }
 
@@ -321,7 +330,7 @@ ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void 
 {
     int entity_ind, comp_info_ind;
     if (!itoi_map_get(&entity_to_index_map, entity, &entity_ind) || 
-        !stoi_map_get(&component_name_to_index_map, name, &comp_info_ind)) 
+            !stoi_map_get(&component_name_to_index_map, name, &comp_info_ind)) 
     {
         return ECS_ERR_NULL;
     }
@@ -331,6 +340,180 @@ ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void 
     int comp_ind;
     itoi_map_get(&comp_info->entity_to_index_map, entity, &comp_ind);
     vector_get(&comp_info->array, comp_ind, dest);
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event)
+{
+    if (stoi_map_get(&system_name_to_index_map, name, NULL))
+    {
+        return ECS_ERR_EXISTS;
+    }
+
+    vector_push_back(&systems, &(system_info_t){ .system=system, .event=event, .signature=signature });
+    stoi_map_insert(&system_name_to_index_map, name, systems.size - 1);
+
+    system_info_t *sys_info;
+    vector_get(&systems, systems.size - 1, (void **)&sys_info);
+
+    vector_init(&sys_info->entities, sizeof(ecs_entity_t), 1);
+
+    switch (event)
+    {
+        case ECS_SYSTEM_ON_INIT:
+            vector_push_back(&on_init_system_indices, &((int){ systems.size - 1 }));
+            break;
+        case ECS_SYSTEM_ON_UPDATE:
+            vector_push_back(&on_update_system_indices, &((int){ systems.size - 1 }));
+            break;
+        case ECS_SYSTEM_ON_END:
+            vector_push_back(&on_end_system_indices, &((int){ systems.size - 1 }));
+            break;
+        default: break;
+    }
+
+    // Append all corresponding entities to the system
+    for (int i = 0; i < entities.size; ++i)
+    {
+        entity_info_t *entity_info;
+        vector_get(&entities, i, (void **)&entity_info);
+
+        if (signature == entity_info->signature)
+        {
+            vector_push_back(&sys_info->entities, &entity_info->entity);
+        }
+    }
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_unregister_system_by_name(const char *name)
+{
+    int sys_info_id;
+    if (!stoi_map_get(&system_name_to_index_map, name, &sys_info_id))
+    {
+        return ECS_ERR_NULL;
+    }
+
+    system_info_t *sys_info;
+    vector_get(&systems, sys_info_id, (void **)&sys_info);
+
+    vector_free(&sys_info->entities);
+    vector_remove(&systems, sys_info_id);
+
+    // Edit mappings
+    // TODO
+    stoi_map_remove(&system_name_to_index_map, name);
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_set_system_parameters_by_name(const char *name, void *args)
+{
+    int sys_info_id;
+    if (!stoi_map_get(&system_name_to_index_map, name, &sys_info_id))
+    {
+        return ECS_ERR_NULL;
+    }
+
+    system_info_t *sys_info;
+    vector_get(&systems, sys_info_id, (void **)&sys_info);
+
+    sys_info->args = args;
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_call_system_by_name(const char *name)
+{
+    int sys_info_id;
+    if (!stoi_map_get(&system_name_to_index_map, name, &sys_info_id))
+    {
+        return ECS_ERR_NULL;
+    }
+
+    system_info_t *sys_info;
+    vector_get(&systems, sys_info_id, (void **)&sys_info);
+
+    sys_info->system((ecs_entity_t *)sys_info->entities.data, sys_info->entities.size, sys_info->args);
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_listen_systems(ecs_system_event_t event)
+{
+    int sys_id;
+    system_info_t *sys_info;
+    vector_t *sys_indices;
+    switch (event) 
+    {
+        case ECS_SYSTEM_ON_INIT:
+            sys_indices = &on_init_system_indices;
+            break;
+        case ECS_SYSTEM_ON_UPDATE:
+            sys_indices = &on_update_system_indices;
+            break;
+        case ECS_SYSTEM_ON_END:
+            sys_indices = &on_end_system_indices;
+            break;
+        default:
+            return ECS_ERR_NULL;
+    }
+
+    for (int i = 0; i < sys_indices->size; ++i)
+    {
+        vector_get_copy(sys_indices, i, &sys_id);
+        vector_get(&systems, sys_id, (void **)&sys_info);
+        sys_info->status = sys_info->system((ecs_entity_t *)sys_info->entities.data, sys_info->entities.size, sys_info->args);
+    }
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *names)
+{
+    char *names_cpy = strdup(names);
+    if (names_cpy == NULL)
+    {
+        return ECS_ERR_NULL;
+    }
+
+    ecs_signature_t sign = 0;
+    char *name = strtok(names_cpy, ",");
+    while (name != NULL)
+    {
+        while (*name == ' ') name++;
+        int ind;
+        if (!stoi_map_get(&component_name_to_index_map, name, &ind))
+        {
+            free(names_cpy);
+            return ECS_ERR_NULL;
+        }
+        
+        sign |= (1 << ind);
+        name = strtok(NULL, ",");
+    }
+
+    *signature = sign;
+
+    free(names_cpy);
+
+    return ECS_OK;
+}
+
+ecs_err_t ecs_get_system_status_by_name(const char *name, ecs_err_t *ret)
+{
+    int sys_info_id;
+    if (!stoi_map_get(&system_name_to_index_map, name, &sys_info_id))
+    {
+        return ECS_ERR_NULL;
+    }
+
+    system_info_t *sys_info;
+    vector_get(&systems, sys_info_id, (void **)&sys_info);
+
+    *ret = sys_info->status;
 
     return ECS_OK;
 }

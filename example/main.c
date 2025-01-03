@@ -17,7 +17,7 @@ typedef struct
     float vx, vy, vz;
 } rigidbody_t;
 
-ecs_system_t physics_system(ecs_entity_t *it, int count, void *args)
+ecs_err_t physics_system(ecs_entity_t *it, int count, void *args)
 {
     float dt = ((float *)args)[0];
 
@@ -25,14 +25,12 @@ ecs_system_t physics_system(ecs_entity_t *it, int count, void *args)
     {
         transform_t *transform;
         rigidbody_t *rb;
-        ecs_get_component(*it, transform_t, &transform);
-        ecs_get_component(*it, rigidbody_t, &rb);
+        ecs_get_component(it[i], transform_t, &transform);
+        ecs_get_component(it[i], rigidbody_t, &rb);
 
         transform->x += rb->vx * dt;
         transform->y += rb->vy * dt;
         transform->z += rb->vz * dt;
-
-        ++it;
     }
 
     return ECS_OK;
@@ -64,13 +62,24 @@ int main(void)
     printf("Transform : x=%.2f, y=%.2f, z=%.2f\n", transform->x, transform->y, transform->z);
     printf("Rigidbody: vx=%.2f, vy=%.2f, vz=%.2f\n", rb->vx, rb->vy, rb->vz);
 
-    transform->x = 1000;
-    rb->vz = 1000;
+    ecs_signature_t signature;
+    ret |= ecs_create_signature(&signature, transform_t, rigidbody_t);
+    ECS_CHECK_ERROR(ret, "Failed to create signature : ");
 
-    ret |= ecs_get_component(player, transform_t, &transform);
-    ret |= ecs_get_component(player, rigidbody_t, &rb);
-    printf("Transform : x=%.2f, y=%.2f, z=%.2f\n", transform->x, transform->y, transform->z);
-    printf("Rigidbody: vx=%.2f, vy=%.2f, vz=%.2f\n", rb->vx, rb->vy, rb->vz);
+    ret |= ecs_register_system(physics_system, ECS_SYSTEM_ON_UPDATE, signature);
+    ECS_CHECK_ERROR(ret, "Failed to register physics system : ");
+
+    float dt = 0.1f;
+    ecs_set_system_parameters(physics_system, &dt);
+
+    while (1)
+    {
+        ecs_listen_systems(ECS_SYSTEM_ON_UPDATE);
+        ecs_get_system_status(physics_system, &ret);
+        ECS_CHECK_ERROR(ret, "Error in the system : ");
+
+        printf("Transform : x=%.2f, y=%.2f, z=%.2f\n", transform->x, transform->y, transform->z);
+    }
 
     ecs_terminate();
     return 0;

@@ -1,60 +1,71 @@
 /**
  * @author      : stanleyarn (stanleyarn@$HOSTNAME)
  * @file        : vector
- * @created     : Jeudi jan 02, 2025 02:50:49 CET
+ * @created     : Vendredi jan 03, 2025 12:50:47 CET
  */
 
 //------------------------------------------------------------------------------
 // Includes
 //------------------------------------------------------------------------------
 #include "vector.h"
+
 #include <stdlib.h>
 #include <string.h>
 
-int vector_init(vector_t *vec, size_t element_size, int initial_capacity)
+//------------------------------------------------------------------------------
+// Function Implementations
+//------------------------------------------------------------------------------
+int vector_init(vector_t *vec, size_t element_size, size_t initial_capacity)
 {
-    vec->array = malloc(initial_capacity * sizeof(void *));
-    if (vec->array == NULL)
-    {
-        return 1;
-    }
-    vec->size = 0;
-    vec->capacity = initial_capacity;
     vec->element_size = element_size;
+    vec->capacity = initial_capacity;
+    vec->size = 0;
+    if (initial_capacity)
+    {
+        vec->data = malloc(element_size * vec->capacity);
+        if (vec->data == NULL)
+        {
+            return 1;
+        }
+    }
+    else
+    {
+        vec->data = NULL;
+    }
 
     return 0;
 }
 
-int vector_resize(vector_t *vec)
+int vector_reserve(vector_t *vec, size_t additional_capacity)
 {
-    void **new_array = realloc(vec->array, (vec->capacity * 2) * sizeof(void *));
-    if (new_array == NULL)
+    void *ndata = realloc(vec->data, (vec->capacity + additional_capacity) * vec->element_size);
+    if (ndata == NULL)
     {
         return 1;
     }
-    vec->array = new_array;
-    vec->capacity *= 2;
+    vec->data = ndata;
+    vec->capacity += additional_capacity;
 
     return 0;
 }
 
 int vector_shrink(vector_t *vec)
 {
-    if (vec->size == 0) 
+    if (vec->size == 0)
     {
-        free(vec->array);
-        vec->array = NULL;
+        free(vec->data);
+        vec->data = NULL;
         vec->capacity = 0;
-    } 
-    else 
+    }
+    else
     {
-        vec->capacity = vec->size;
-        void **new_array = realloc(vec->array, vec->capacity * sizeof(void *));
-        if (new_array == NULL)
+        void *ndata = realloc(vec->data, vec->size * vec->element_size);
+        if (ndata == NULL)
         {
             return 1;
         }
-        vec->array = new_array;
+        vec->data = ndata;
+        vec->capacity = vec->size;
     }
 
     return 0;
@@ -62,63 +73,21 @@ int vector_shrink(vector_t *vec)
 
 int vector_push_back(vector_t *vec, void *element)
 {
-    if (vec->size == vec->capacity)
+    if (vec->size >= vec->capacity)
     {
-        int ret = vector_resize(vec);
-        if(ret)
+        size_t new_capacity = vec->capacity ? vec->capacity * 2 : 1;
+        void *ndata = realloc(vec->data, new_capacity * vec->element_size);
+        if (ndata == NULL)
         {
-            return ret;
+            return 1;
         }
+        vec->data = ndata;
+        vec->capacity = new_capacity;
     }
 
-    void *new_element = malloc(vec->element_size);
-    if (new_element == NULL)
-    {
-        return 1;
-    }
-    memcpy(new_element, element, vec->element_size);
-    vec->array[vec->size++] = new_element;
+    memcpy((char *)vec->data + vec->size * vec->element_size, element, vec->element_size);
+    ++vec->size;
 
     return 0;
 }
 
-inline void vector_get(vector_t *vec, int index, void **out_element)
-{
-    *out_element = vec->array[index];
-}
-
-inline void vector_get_cpy(vector_t *vec, int index, void *out_element)
-{
-    memcpy(out_element, vec->array[index], vec->element_size);
-}
-
-void vector_remove_ind(vector_t *vec, int index)
-{
-    if (vec->size == 0) 
-    {
-        return;
-    }
-
-    free(vec->array[index]);
-
-    if (index < vec->size - 1) 
-    {
-        vec->array[index] = vec->array[vec->size - 1];
-    }
-
-    vec->size--;
-}
-
-void vector_free(vector_t *vec)
-{
-    for (int i = 0; i < vec->size; i++)
-    {
-        free(vec->array[i]);
-    }
-
-    free(vec->array);
-
-    vec->element_size = 0;
-    vec->size = 0;
-    vec->capacity = 0;
-}
