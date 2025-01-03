@@ -53,6 +53,7 @@ extern "C" {
 //------------------------------------------------------------------------------
 typedef int ecs_err_t;
 typedef uint32_t ecs_entity_t;
+typedef uint32_t ecs_scene_t;
 typedef uint32_t ecs_signature_t;
 typedef ecs_err_t (*ecs_system_t)(ecs_entity_t *, int count, void *args);
 
@@ -71,9 +72,13 @@ typedef enum
 extern ecs_err_t ecs_init();
 extern ecs_err_t ecs_terminate();
 
+extern ecs_err_t ecs_create_scene(ecs_scene_t *scene);
+extern ecs_err_t ecs_bind_scene(ecs_scene_t scene);
+extern ecs_err_t ecs_free_scene();
+
 // Memory optimisations
-extern ecs_err_t ecs_reserve(ecs_entity_t max_entities);
-extern ecs_err_t ecs_shrink();
+extern ecs_err_t ecs_reserve_entities(ecs_entity_t max_entities);
+extern ecs_err_t ecs_shrink_entities();
 
 extern ecs_err_t ecs_create_entity(ecs_entity_t *entity);
 extern ecs_err_t ecs_delete_entity(ecs_entity_t entity);

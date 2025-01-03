@@ -42,6 +42,10 @@ int main(void)
 
     ecs_err_t ret;
 
+    ecs_scene_t scene;
+    ecs_create_scene(&scene);
+    ecs_bind_scene(scene);
+
     ecs_entity_t player;
     ecs_create_entity(&player);
 
@@ -72,7 +76,9 @@ int main(void)
     float dt = 0.1f;
     ecs_set_system_parameters(physics_system, &dt);
 
-    while (1)
+    ecs_listen_systems(ECS_SYSTEM_ON_INIT);
+
+    for (int i = 0; i < 10; ++i)
     {
         ecs_listen_systems(ECS_SYSTEM_ON_UPDATE);
         ecs_get_system_status(physics_system, &ret);
@@ -80,6 +86,11 @@ int main(void)
 
         printf("Transform : x=%.2f, y=%.2f, z=%.2f\n", transform->x, transform->y, transform->z);
     }
+
+    ecs_listen_systems(ECS_SYSTEM_ON_END);
+
+    ecs_free_scene();
+    ecs_bind_scene(0);
 
     ecs_terminate();
     return 0;
