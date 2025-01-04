@@ -2,10 +2,25 @@
 
 > A simple Entity-Component-System in pure C99.
 
-**THE PROJECT IS STILL UNDER DEVELOPMENT AND MAY BE UNSTABLE**
+**DISCLAIMER:** the project is still under development and may be unstable.
 
 Remaining task:
 - Unregister system
+
+## Build
+
+**Supported platforms:**
+- Linux
+- MacOS
+
+*On Windows you will need to edit the makefile.*
+
+Just run
+```bash
+git clone https://github.com/stantonik/csimple-ecs.git
+cd csimple-ecs
+make
+```
 
 ## Example of Usage
 
@@ -96,4 +111,4 @@ Free the memory with `ecs_terminate()`
 
 ## License
 
-This project is licensed under the MIT License. See the full license text [here](./LICENSE).tity-Component-System in pure C99.
+This project is licensed under the MIT License. See the full license text [here](./LICENSE).
