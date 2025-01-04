@@ -12,6 +12,7 @@
 #include "../src/utils/itoi_map.h"
 #include "../src/utils/stoi_map.h"
 #include "../src/utils/vector.h"
+#include "../src/utils/set.h"
 #include <stddef.h>
 
 #include "stdio.h"
@@ -46,7 +47,8 @@ typedef struct
     ecs_signature_t signature;
     ecs_system_event_t event;
 
-    vector_t entities;
+    set_t entities_s;
+    vector_t entities_v;
 } system_info_t;
 
 typedef struct
@@ -171,7 +173,8 @@ ecs_err_t ecs_free_scene()
     {
         system_info_t *sys;
         vector_get(&cs->systems, i, (void **)&sys);
-        vector_free(&sys->entities);
+        vector_free(&sys->entities_v);
+        set_free(&sys->entities_s);
     }
     vector_free(&cs->systems);
     vector_free(&cs->on_init_system_indices);
@@ -355,9 +358,13 @@ ecs_err_t ecs_add_component_by_name(ecs_entity_t entity, const char *name, void 
     {
         system_info_t *sys_info;
         vector_get(&cs->systems, i, (void **)&sys_info);
-        if (sys_info->signature == entity_info->signature)
+        if ((sys_info->signature & entity_info->signature) == sys_info->signature)
         {
-            vector_push_back(&sys_info->entities, &entity);
+            if (!set_contains(&sys_info->entities_s, entity))
+            {
+                vector_push_back(&sys_info->entities_v, &entity);
+                set_insert(&sys_info->entities_s, entity);
+            }
         }
     }
 
@@ -396,9 +403,10 @@ ecs_err_t remove_component_by_index(ecs_entity_t entity, uint8_t index)
     {
         system_info_t *sys_info;
         vector_get(&cs->systems, i, (void **)&sys_info);
-        if (sys_info->signature == entity_info->signature)
+        if ((sys_info->signature & entity_info->signature) == sys_info->signature)
         {
-            vector_remove(&sys_info->entities, i);
+            vector_remove(&sys_info->entities_v, i);
+            set_delete(&sys_info->entities_s, entity);
         }
     }
 
@@ -447,7 +455,8 @@ ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs
     system_info_t *sys_info;
     vector_get(&cs->systems, cs->systems.size - 1, (void **)&sys_info);
 
-    vector_init(&sys_info->entities, sizeof(ecs_entity_t), 1);
+    vector_init(&sys_info->entities_v, sizeof(ecs_entity_t), 1);
+    set_init(&sys_info->entities_s);
 
     switch (event)
     {
@@ -469,9 +478,13 @@ ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs
         entity_info_t *entity_info;
         vector_get(&cs->entities, i, (void **)&entity_info);
 
-        if (signature == entity_info->signature)
+        if ((signature & entity_info->signature) == signature)
         {
-            vector_push_back(&sys_info->entities, &entity_info->entity);
+            if (!set_contains(&sys_info->entities_s, entity_info->entity))
+            {
+                vector_push_back(&sys_info->entities_v, &entity_info->entity);
+                set_insert(&sys_info->entities_s, entity_info->entity);
+            }
         }
     }
 
@@ -489,7 +502,8 @@ ecs_err_t ecs_unregister_system_by_name(const char *name)
     system_info_t *sys_info;
     vector_get(&cs->systems, sys_info_id, (void **)&sys_info);
 
-    vector_free(&sys_info->entities);
+    vector_free(&sys_info->entities_v);
+    set_free(&sys_info->entities_s);
     vector_remove(&cs->systems, sys_info_id);
 
     // Edit mappings
@@ -526,7 +540,7 @@ ecs_err_t ecs_call_system_by_name(const char *name)
     system_info_t *sys_info;
     vector_get(&cs->systems, sys_info_id, (void **)&sys_info);
 
-    sys_info->system((ecs_entity_t *)sys_info->entities.data, sys_info->entities.size, sys_info->args);
+    sys_info->system((ecs_entity_t *)sys_info->entities_v.data, sys_info->entities_v.size, sys_info->args);
 
     return ECS_OK;
 }
@@ -555,7 +569,7 @@ ecs_err_t ecs_listen_systems(ecs_system_event_t event)
     {
         vector_get_copy(sys_indices, i, &sys_id);
         vector_get(&cs->systems, sys_id, (void **)&sys_info);
-        sys_info->status = sys_info->system((ecs_entity_t *)sys_info->entities.data, sys_info->entities.size, sys_info->args);
+        sys_info->status = sys_info->system((ecs_entity_t *)sys_info->entities_v.data, sys_info->entities_v.size, sys_info->args);
     }
 
     return ECS_OK;

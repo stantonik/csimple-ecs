@@ -9,7 +9,8 @@
 ######################################################################
 
 # Executable name
-EXEC = test
+EXAMPLE_EXEC = example
+LIB_NAME = csimple_ecs
 
 # Build directory
 BUILD_DIR_ROOT = build
@@ -17,10 +18,10 @@ BUILD_DIR_ROOT = build
 # Sources
 SRC_DIR = src
 SRCS := $(sort $(shell find $(SRC_DIR) -name '*.c'))
-SRCS += example/main.c
+EXAMPLE_SRC = example/main.c
 
 # Library directory
-LIBS_DIR = libs
+LIBS_DIR = lib
 
 # Includes
 INCLUDE_DIR = include
@@ -43,7 +44,7 @@ LDLIBS =
 
 # Add .exe extension to executables on Windows
 ifeq ($(OS),windows)
-	EXEC := $(EXEC).exe
+	EXAMPLE_EXEC := $(EXAMPLE_EXEC).exe
 endif
 
 BUILD_DIR := $(BUILD_DIR_ROOT)/$(OS)
@@ -69,18 +70,26 @@ FILES := $(shell find $(SRC_DIR) $(INCLUDE_DIR) -name '*.c' -o -name '*.h' -o -n
 # Disable default implicit rules
 .SUFFIXES:
 
+# Create static library
 .PHONY: all
-all: $(BIN_DIR)/$(EXEC)
+all: $(OBJS)
+	@echo "Creating static library: $(LIBS_DIR)/$(LIB_NAME).a"
+	@mkdir -p $(LIBS_DIR)
+	ar rcs $(LIBS_DIR)/$(LIB_NAME).a $(OBJS)
+
+.PHONY: example
+example: $(BIN_DIR)/$(EXAMPLE_EXEC)
+	$(BIN_DIR)/$(EXAMPLE_EXEC)
 
 # Build executable
-$(BIN_DIR)/$(EXEC): $(OBJS)
-	@echo "Detected platform : $(OS)"
+$(BIN_DIR)/$(EXAMPLE_EXEC):
 	@echo "Building executable: $@"
 	@mkdir -p $(@D)
-	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(EXAMPLE_SRC) $(LIBS_DIR)/$(LIB_NAME).a -o $@
 
 # Compile C source files
 $(OBJS): $(OBJ_DIR)/%.o: %.c
+	@echo "Detected platform : $(OS)"
 	@echo "Compiling: $<"
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
@@ -88,13 +97,9 @@ $(OBJS): $(OBJ_DIR)/%.o: %.c
 # Include automatically-generated dependency files
 -include $(DEPS)
 
-.PHONY: run
-run: $(BIN_DIR)/$(EXEC)
-	@cd $(BIN_DIR) && ./$(EXEC)
-
 .PHONY: clean
 clean:
-	$(RM) -rf $(BUILD_DIR_ROOT)
+	$(RM) -rf $(BUILD_DIR)
 
 .PHONY: compdb
 compdb: $(BUILD_DIR_ROOT)/compile_commands.json
@@ -116,3 +121,15 @@ $(COMPDBS): $(OBJ_DIR)/%.json: %.c
 	    \"command\": \"$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $(basename $@).o\",\n\
 	    \"file\": \"$<\"\n\
 	}\n" > $@
+
+.PHONY: help
+help:
+	@echo "\
+	Usage: make target... [options]...\n\
+	\n\
+	Targets:\n\
+	  all             Build static library (default target)\n\
+	  example         Build and run example\n\
+	  clean           Clean build directory (all platforms)\n\
+	  compdb          Generate JSON compilation database (compile_commands.json)\n\
+	  help            Print this information\n"
