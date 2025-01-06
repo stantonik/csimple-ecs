@@ -44,42 +44,19 @@ typedef struct
 // Function Prototypes
 //------------------------------------------------------------------------------
 extern int vector_init(vector_t *vec, size_t element_size, size_t initial_capacity);
-static inline void vector_free(vector_t *vec);
+extern void vector_free(vector_t *vec);
 
 extern int vector_shrink(vector_t *vec);
 extern int vector_reserve(vector_t *vec, size_t additionnal_capacity);
 extern int vector_push_back(vector_t *vec, void *element);
-static inline void vector_get(vector_t *vec, unsigned int index, void **output);
-static inline void vector_get_copy(vector_t *vec, unsigned int index, void *output);
-static inline void vector_remove(vector_t *vec, unsigned int index);
+extern void vector_get(vector_t *vec, unsigned int index, void **output);
+extern void vector_get_copy(vector_t *vec, unsigned int index, void *output);
+extern void vector_remove(vector_t *vec, unsigned int index);
 
 //------------------------------------------------------------------------------
 // Inline Functions
 //------------------------------------------------------------------------------
-inline void vector_get(vector_t *vec, unsigned int index, void **output)
-{
-    *output = ((char *)vec->data + index * vec->element_size);
-}
 
-inline void vector_get_copy(vector_t *vec, unsigned int index, void *output)
-{
-    memcpy(output, (char *)vec->data + index * vec->element_size, vec->element_size);
-}
-
-inline void vector_remove(vector_t *vec, unsigned int index)
-{
-    memcpy((char *)vec->data + index * vec->element_size, (char *)vec->data + (vec->size - 1) * vec->element_size, vec->element_size);
-    --vec->size;
-}
-
-inline void vector_free(vector_t *vec)
-{
-    free(vec->data);
-    vec->data = NULL;
-    vec->element_size = 0;
-    vec->capacity = 0;
-    vec->size = 0;
-}
 
 #ifdef __cplusplus
 }

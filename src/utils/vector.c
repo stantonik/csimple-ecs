@@ -91,3 +91,29 @@ int vector_push_back(vector_t *vec, void *element)
     return 0;
 }
 
+inline void vector_get(vector_t *vec, unsigned int index, void **output)
+{
+    *output = ((char *)vec->data + index * vec->element_size);
+}
+
+inline void vector_get_copy(vector_t *vec, unsigned int index, void *output)
+{
+    memcpy(output, (char *)vec->data + index * vec->element_size, vec->element_size);
+}
+
+inline void vector_remove(vector_t *vec, unsigned int index)
+{
+    memmove((char *)vec->data + index * vec->element_size, 
+            (char *)vec->data + (index + 1) * vec->element_size, 
+            (vec->size - index - 1) * vec->element_size);
+    --vec->size;
+}
+
+inline void vector_free(vector_t *vec)
+{
+    free(vec->data);
+    vec->data = NULL;
+    vec->element_size = 0;
+    vec->capacity = 0;
+    vec->size = 0;
+}

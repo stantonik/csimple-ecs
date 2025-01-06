@@ -82,7 +82,8 @@ example: $(BIN_DIR)/$(EXAMPLE_EXEC)
 	$(BIN_DIR)/$(EXAMPLE_EXEC)
 
 # Build executable
-$(BIN_DIR)/$(EXAMPLE_EXEC):
+$(BIN_DIR)/$(EXAMPLE_EXEC): $(EXAMPLE_SRC) $(OBJS)
+	$(MAKE) all
 	@echo "Building executable: $@"
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(EXAMPLE_SRC) $(LIBS_DIR)/$(LIB_NAME).a -o $@

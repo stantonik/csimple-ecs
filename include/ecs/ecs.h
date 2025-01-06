@@ -35,19 +35,6 @@ extern "C" {
         ecs_create_signature_by_names(signature, #__VA_ARGS__); \
         })
 
-#define ecs_register_system(system, event, signature) ({ (void)system, ecs_register_system_by_name(#system, system, signature, event); })
-
-#define ecs_set_system_parameters(system, args) ({ (void)system, ecs_set_system_parameters_by_name(#system, args); })
-
-#define ecs_call_system(system) ({ (void)system, ecs_call_system_by_name(#system); })
-
-#define ecs_get_system_status(system, ret) ({ (void)system, ecs_get_system_status_by_name(#system, ret); })
-
-//------------------------------------------------------------------------------
-// Constants
-//------------------------------------------------------------------------------
-
-
 //------------------------------------------------------------------------------
 // Typedefs and Enums
 //------------------------------------------------------------------------------
@@ -91,12 +78,12 @@ extern ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name
 
 extern ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *names);
 
-extern ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event);
-extern ecs_err_t ecs_unregister_system_by_name(const char *name);
-extern ecs_err_t ecs_set_system_parameters_by_name(const char *name, void *args);
-extern ecs_err_t ecs_call_system_by_name(const char *name);
+extern ecs_err_t ecs_register_system(ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event);
+extern ecs_err_t ecs_unregister_system(ecs_system_t system);
+extern ecs_err_t ecs_set_system_parameters(ecs_system_t system, void *args);
+extern ecs_err_t ecs_call_system(ecs_system_t system);
 extern ecs_err_t ecs_listen_systems(ecs_system_event_t event);
-extern ecs_err_t ecs_get_system_status_by_name(const char *name, ecs_err_t *ret);
+extern ecs_err_t ecs_get_system_status(ecs_system_t system, ecs_err_t *ret);
 
 //------------------------------------------------------------------------------
 // Inline Functions

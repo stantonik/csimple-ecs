@@ -10,6 +10,7 @@
 #include "ecs/ecs.h"
 #include "ecs/ecs_err.h"
 #include "../src/utils/itoi_map.h"
+#include "../src/utils/uiptrtoi_map.h"
 #include "../src/utils/stoi_map.h"
 #include "../src/utils/vector.h"
 #include "../src/utils/set.h"
@@ -65,7 +66,7 @@ typedef struct
     stoi_map_t component_name_to_index_map;
 
     vector_t systems;
-    stoi_map_t system_name_to_index_map;
+    uiptrtoi_map_t system_to_index_map;
 
     vector_t on_init_system_indices;
     vector_t on_update_system_indices;
@@ -145,7 +146,7 @@ ecs_err_t ecs_create_scene(ecs_scene_t *scene)
     }
 
     stoi_map_init(&nscene.component_name_to_index_map);
-    stoi_map_init(&nscene.system_name_to_index_map);
+    uiptrtoi_map_init(&nscene.system_to_index_map);
     itoi_map_init(&nscene.entity_to_index_map);
 
     vector_push_back(&scenes, &nscene);
@@ -182,11 +183,13 @@ ecs_err_t ecs_free_scene()
     vector_free(&cs->on_end_system_indices);
 
     stoi_map_destroy(&cs->component_name_to_index_map);
-    stoi_map_destroy(&cs->system_name_to_index_map);
+    uiptrtoi_map_destroy(&cs->system_to_index_map);
     itoi_map_destroy(&cs->entity_to_index_map);
 
-    vector_remove(&scenes, cs->scene);
+    int del_scene_id;
+    itoi_map_get(&scene_to_index_map, cs->scene, &del_scene_id);
     itoi_map_remove(&scene_to_index_map, cs->scene);
+    vector_remove(&scenes, del_scene_id);
     vector_push_back(&recycled_scene_ids, &cs->scene);
     cs = NULL;
 
@@ -284,28 +287,34 @@ ecs_err_t ecs_create_entity(ecs_entity_t *entity)
 
 ecs_err_t ecs_delete_entity(ecs_entity_t entity)
 {
-    int del_entity_ind;
+    int del_entity_ind, last_entity_ind;
     if (!itoi_map_get(&cs->entity_to_index_map, entity, &del_entity_ind))
     {
         return ECS_ERR_NULL;
     }
 
-    entity_info_t *del_entity_info;
+    last_entity_ind = cs->entities.size - 1;
+
+    entity_info_t *del_entity_info, *last_entity_info;
     vector_get(&cs->entities, del_entity_ind, (void **)&del_entity_info);
 
     // Remove all components from entity
-    for (int i = 0; i < ECS_MAX_COMPONENTS; ++i)
+    for (int i = 0; i < ECS_MAX_COMPONENTS; ++i) 
     {
-        remove_component_by_index(entity, i);
+        if (del_entity_info->signature & (1 << i))
+        {
+            remove_component_by_index(entity, i);
+        }
     }
 
-    // Edit mappings
-    entity_info_t *last_entity_info;
-    vector_get(&cs->entities, cs->entities.size - 1, (void **)&last_entity_info);
-    itoi_map_remove(&cs->entity_to_index_map, last_entity_info->entity);
-    itoi_map_insert(&cs->entity_to_index_map, last_entity_info->entity, del_entity_ind);
+    if (del_entity_ind != last_entity_ind)
+    {
+        vector_get(&cs->entities, last_entity_ind, (void **)&last_entity_info);
+        memcpy(del_entity_info, last_entity_info, sizeof(entity_info_t));
+        itoi_map_insert(&cs->entity_to_index_map, last_entity_info->entity, del_entity_ind);
+    }
 
-    vector_remove(&cs->entities, del_entity_ind);
+    vector_remove(&cs->entities, last_entity_ind);
     itoi_map_remove(&cs->entity_to_index_map, entity);
     vector_push_back(&cs->recycled_entities, &entity);
 
@@ -389,14 +398,31 @@ ecs_err_t remove_component_by_index(ecs_entity_t entity, uint8_t index)
     }
 
     // Remove component from component array
+    // Step 1 - get del comp ind and last comp ind
     component_info_t *comp_info = &cs->components[index];
-    int del_comp_id;
-    itoi_map_get(&comp_info->entity_to_index_map, entity, &del_comp_id);
-    vector_remove(&comp_info->array, del_comp_id);
+    int del_comp_ind, last_comp_ind;
+    itoi_map_get(&comp_info->entity_to_index_map, entity, &del_comp_ind);
+    last_comp_ind = comp_info->array.size - 1;
 
-    // Edit mappings
+    // Only perform shift if necessary
+    int last_entity;
+    if (del_comp_ind != last_comp_ind)
+    {
+        void *del_comp, *last_comp;
+        vector_get(&comp_info->array, del_comp_ind, &del_comp);
+        vector_get(&comp_info->array, last_comp_ind, &last_comp);
+        memcpy(del_comp, last_comp, comp_info->array.element_size);
+
+        // Update mappings
+        itoi_map_get(&comp_info->index_to_entity_map, last_comp_ind, &last_entity);
+        itoi_map_insert(&comp_info->entity_to_index_map, last_entity, del_comp_ind);
+        itoi_map_insert(&comp_info->index_to_entity_map, del_comp_ind, last_entity);
+    }
+
+    // Remove last component and entity mapping
+    vector_remove(&comp_info->array, last_comp_ind);
+    itoi_map_remove(&comp_info->index_to_entity_map, last_comp_ind);
     itoi_map_remove(&comp_info->entity_to_index_map, entity);
-    itoi_map_remove(&comp_info->index_to_entity_map, del_comp_id);
 
     // Remove entity from the corresponding system
     for (int i = 0; i < cs->systems.size; ++i)
@@ -442,21 +468,22 @@ ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void 
     return ECS_OK;
 }
 
-ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event)
+ecs_err_t ecs_register_system(ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event)
 {
-    if (stoi_map_get(&cs->system_name_to_index_map, name, NULL))
+    if (uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, NULL))
     {
         return ECS_ERR_EXISTS;
     }
 
     vector_push_back(&cs->systems, &(system_info_t){ .system=system, .event=event, .signature=signature });
-    stoi_map_insert(&cs->system_name_to_index_map, name, cs->systems.size - 1);
+    uiptrtoi_map_insert(&cs->system_to_index_map, (uintptr_t)system, cs->systems.size - 1);
 
     system_info_t *sys_info;
     vector_get(&cs->systems, cs->systems.size - 1, (void **)&sys_info);
 
     vector_init(&sys_info->entities_v, sizeof(ecs_entity_t), 1);
     set_init(&sys_info->entities_s);
+
 
     switch (event)
     {
@@ -472,29 +499,13 @@ ecs_err_t ecs_register_system_by_name(const char *name, ecs_system_t system, ecs
         default: break;
     }
 
-    // Append all corresponding entities to the system
-    for (int i = 0; i < cs->entities.size; ++i)
-    {
-        entity_info_t *entity_info;
-        vector_get(&cs->entities, i, (void **)&entity_info);
-
-        if ((signature & entity_info->signature) == signature)
-        {
-            if (!set_contains(&sys_info->entities_s, entity_info->entity))
-            {
-                vector_push_back(&sys_info->entities_v, &entity_info->entity);
-                set_insert(&sys_info->entities_s, entity_info->entity);
-            }
-        }
-    }
-
     return ECS_OK;
 }
 
-ecs_err_t ecs_unregister_system_by_name(const char *name)
+ecs_err_t ecs_unregister_system(ecs_system_t system)
 {
     int sys_info_id;
-    if (!stoi_map_get(&cs->system_name_to_index_map, name, &sys_info_id))
+    if (!uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, &sys_info_id))
     {
         return ECS_ERR_NULL;
     }
@@ -508,15 +519,15 @@ ecs_err_t ecs_unregister_system_by_name(const char *name)
 
     // Edit mappings
     // TODO
-    stoi_map_remove(&cs->system_name_to_index_map, name);
+    uiptrtoi_map_remove(&cs->system_to_index_map, (uintptr_t)system);
 
     return ECS_OK;
 }
 
-ecs_err_t ecs_set_system_parameters_by_name(const char *name, void *args)
+ecs_err_t ecs_set_system_parameters(ecs_system_t system, void *args)
 {
     int sys_info_id;
-    if (!stoi_map_get(&cs->system_name_to_index_map, name, &sys_info_id))
+    if (!uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, &sys_info_id))
     {
         return ECS_ERR_NULL;
     }
@@ -529,10 +540,10 @@ ecs_err_t ecs_set_system_parameters_by_name(const char *name, void *args)
     return ECS_OK;
 }
 
-ecs_err_t ecs_call_system_by_name(const char *name)
+ecs_err_t ecs_call_system(ecs_system_t system)
 {
     int sys_info_id;
-    if (!stoi_map_get(&cs->system_name_to_index_map, name, &sys_info_id))
+    if (!uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, &sys_info_id))
     {
         return ECS_ERR_NULL;
     }
@@ -606,10 +617,10 @@ ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *
     return ECS_OK;
 }
 
-ecs_err_t ecs_get_system_status_by_name(const char *name, ecs_err_t *ret)
+ecs_err_t ecs_get_system_status(ecs_system_t system, ecs_err_t *ret)
 {
     int sys_info_id;
-    if (!stoi_map_get(&cs->system_name_to_index_map, name, &sys_info_id))
+    if (!uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, &sys_info_id))
     {
         return ECS_ERR_NULL;
     }

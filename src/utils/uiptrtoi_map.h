@@ -1,11 +1,11 @@
 /**
  * @author      : stanleyarn (stanleyarn@$HOSTNAME)
- * @file        : itoi_map
- * @created     : Jeudi jan 02, 2025 01:46:27 CET
+ * @file        : uiptrtoi_map
+ * @created     : Lundi jan 06, 2025 09:32:03 CET
  */
 
-#ifndef ITOI_MAP_H
-#define ITOI_MAP_H
+#ifndef UIPTRTOI_MAP_H
+#define UIPTRTOI_MAP_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,41 +16,43 @@ extern "C" {
 //------------------------------------------------------------------------------
 #include "../src/external/uthash.h"
 
+#include <stdint.h>
+
 //------------------------------------------------------------------------------
 // Typedefs and Enums
 //------------------------------------------------------------------------------
-typedef struct itoi_map_entry
+typedef struct uiptrtoi_map_entry
 {
-    int key;
+    uintptr_t key;
     int value;
     UT_hash_handle hh;
-} itoi_map_entry_t;
+} uiptrtoi_map_entry_t;
 
-typedef struct itoi_map
+typedef struct uiptrtoi_map
 {
-    itoi_map_entry_t *entries;
-} itoi_map_t;
+    uiptrtoi_map_entry_t *entries;
+} uiptrtoi_map_t;
 
 //------------------------------------------------------------------------------
-// Function Prototypes
+// Inlined Functions
 //------------------------------------------------------------------------------
-static inline void itoi_map_init(itoi_map_t *map)
+static inline void uiptrtoi_map_init(uiptrtoi_map_t *map)
 {
     map->entries = NULL;
 }
 
-static inline void itoi_map_insert(itoi_map_t *map, int key, int value)
+static inline void uiptrtoi_map_insert(uiptrtoi_map_t *map, uintptr_t key, int value)
 {
-    itoi_map_entry_t *entry = (itoi_map_entry_t *)malloc(sizeof(itoi_map_entry_t));
+    uiptrtoi_map_entry_t *entry = (uiptrtoi_map_entry_t *)malloc(sizeof(uiptrtoi_map_entry_t));
     entry->key = key;
     entry->value = value;
-    HASH_ADD_INT(map->entries, key, entry);
+    HASH_ADD(hh, map->entries, key, sizeof(uintptr_t), entry);
 }
 
-static inline int itoi_map_get(itoi_map_t *map, int key, int *value)
+static inline int uiptrtoi_map_get(uiptrtoi_map_t *map, uintptr_t key, int *value)
 {
-    itoi_map_entry_t *entry;
-    HASH_FIND_INT(map->entries, &key, entry);
+    uiptrtoi_map_entry_t *entry;
+    HASH_FIND(hh, map->entries, &key, sizeof(uintptr_t), entry);
     if (entry)
     {
         if (value)
@@ -62,10 +64,10 @@ static inline int itoi_map_get(itoi_map_t *map, int key, int *value)
     return 0;
 }
 
-static inline void itoi_map_remove(itoi_map_t *map, int key)
+static inline void uiptrtoi_map_remove(uiptrtoi_map_t *map, uintptr_t key)
 {
-    itoi_map_entry_t *entry;
-    HASH_FIND_INT(map->entries, &key, entry);
+    uiptrtoi_map_entry_t *entry;
+    HASH_FIND(hh, map->entries, &key, sizeof(uintptr_t), entry);
     if (entry)
     {
         HASH_DEL(map->entries, entry);
@@ -73,9 +75,9 @@ static inline void itoi_map_remove(itoi_map_t *map, int key)
     }
 }
 
-static inline void itoi_map_destroy(itoi_map_t *map)
+static inline void uiptrtoi_map_destroy(uiptrtoi_map_t *map)
 {
-    itoi_map_entry_t *entry, *tmp;
+    uiptrtoi_map_entry_t *entry, *tmp;
     HASH_ITER(hh, map->entries, entry, tmp)
     {
         HASH_DEL(map->entries, entry);
@@ -84,10 +86,13 @@ static inline void itoi_map_destroy(itoi_map_t *map)
 }
 
 
+
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
 
-#endif /* ITOI_MAP_H */
+#endif /* UIPTRTOI_MAP_H */
 

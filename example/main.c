@@ -38,7 +38,7 @@ ecs_err_t physics_system(ecs_entity_t *it, int count, void *args)
 
 int main(void)
 {
-    ecs_err_t ret;
+    ecs_err_t ret = ECS_OK;
 
     ecs_init(); // Has to be done first
 
@@ -48,29 +48,28 @@ int main(void)
 
     ecs_register_component(transform_t);
     ecs_register_component(rigidbody_t);
-    
+
+    // Register physic system
+    ecs_signature_t signature;
+    ecs_create_signature(&signature, transform_t, rigidbody_t);
+    ret |= ecs_register_system(physics_system, signature, ECS_SYSTEM_ON_UPDATE);
+    ECS_CHECK_ERROR(ret, "Failed to register system : ");
+
     ecs_entity_t player;
     ecs_create_entity(&player);
     ecs_add_component(player, transform_t, &((transform_t){ .x=1, .y=2, .z=3 }));
     ecs_add_component(player, rigidbody_t, &((rigidbody_t){ .vx=1 }));
 
-    // Create physic system
-    ecs_signature_t signature;
-    ecs_create_signature(&signature, transform_t, rigidbody_t);
-    ecs_register_system(physics_system, ECS_SYSTEM_ON_UPDATE, signature);
-
     // Get entity components
     transform_t *transform;
     rigidbody_t *rb;
-    ret = ecs_get_component(player, transform_t, &transform);
+    ret |= ecs_get_component(player, transform_t, &transform);
     ret |= ecs_get_component(player, rigidbody_t, &rb);
     ECS_CHECK_ERROR(ret, "Failed to get components : ");
 
-    ecs_listen_systems(ECS_SYSTEM_ON_INIT);
-
-    // Gameloop
     float dt = 0.1f;
     ecs_set_system_parameters(physics_system, &dt);
+    // Gameloop
     while (1)
     {
         ecs_listen_systems(ECS_SYSTEM_ON_UPDATE);
@@ -79,6 +78,7 @@ int main(void)
 
         printf("Transform : x=%.2f, y=%.2f, z=%.2f\n",
                 transform->x, transform->y, transform->z);
+        break;
     }
 
     ecs_listen_systems(ECS_SYSTEM_ON_END);
