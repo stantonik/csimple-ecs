@@ -468,6 +468,21 @@ ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void 
     return ECS_OK;
 }
 
+bool ecs_entity_has_component_by_name(ecs_entity_t entity, const char *name)
+{
+    int entity_ind, comp_info_id;
+    if (!itoi_map_get(&cs->entity_to_index_map, entity, &entity_ind) || 
+            !stoi_map_get(&cs->component_name_to_index_map, name, &comp_info_id)) 
+    {
+        return false;
+    }
+
+    entity_info_t *entity_info;
+    vector_get(&cs->entities, entity_ind, (void **)&entity_info);
+
+    return (entity_info->signature & (1 << comp_info_id)) != 0;
+}
+
 ecs_err_t ecs_register_system(ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event)
 {
     if (uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, NULL))
@@ -605,7 +620,7 @@ ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *
             free(names_cpy);
             return ECS_ERR_NULL;
         }
-        
+
         sign |= (1 << ind);
         name = strtok(NULL, ",");
     }

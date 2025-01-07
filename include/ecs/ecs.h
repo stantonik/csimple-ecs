@@ -14,26 +14,32 @@ extern "C" {
 //------------------------------------------------------------------------------
 // Includes
 //------------------------------------------------------------------------------
-#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
+#include <stdint.h>
 
 //------------------------------------------------------------------------------
 // Macros
 //------------------------------------------------------------------------------
 #define ECS_MAX_COMPONENTS 32
 
-#define ecs_register_component(component) ({ ecs_register_component_by_name(#component, sizeof(component)); })
+#define ecs_register_component(component) \
+    (ecs_register_component_by_name(#component, sizeof(component)) && ((void)sizeof(component), true))
 
-#define ecs_add_component(entity, component, default_value) ({ sizeof(component), ecs_add_component_by_name(entity, #component, (void *)(default_value)); })
+#define ecs_add_component(entity, component, default_value) \
+    (ecs_add_component_by_name(entity, #component, (void *)(default_value)) && ((void)sizeof(component), true))
 
-#define ecs_get_component(entity, component, dest) ({ sizeof(component), ecs_get_component_by_name(entity, #component, (void **)dest); })
+#define ecs_get_component(entity, component, dest) \
+    (ecs_get_component_by_name(entity, #component, (void **)(dest)) && ((void)sizeof(component), true))
 
-#define ecs_remove_component(entity, component) {( sizeof(component), ecs_remove_component_by_name(entity, #component)); })
+#define ecs_remove_component(entity, component) \
+    (ecs_remove_component_by_name(entity, #component) && ((void)sizeof(component), true))
 
-#define ecs_create_signature(signature, ...) ({ \
-        ecs_create_signature_by_names(signature, #__VA_ARGS__); \
-        })
+#define ecs_create_signature(signature, ...) \
+    ecs_create_signature_by_names(signature, #__VA_ARGS__)
+
+#define ecs_entity_has_component(entity, component) \
+    (ecs_entity_has_component_by_name(entity, #component) && ((void)sizeof(component), true))
 
 //------------------------------------------------------------------------------
 // Typedefs and Enums
@@ -75,6 +81,7 @@ extern ecs_err_t ecs_unregister_component_by_name(const char *name);
 extern ecs_err_t ecs_add_component_by_name(ecs_entity_t entity, const char *name, void *default_value);
 extern inline ecs_err_t ecs_remove_component_by_name(ecs_entity_t entity, const char *name);
 extern ecs_err_t ecs_get_component_by_name(ecs_entity_t entity, const char *name, void **dest);
+extern bool ecs_entity_has_component_by_name(ecs_entity_t entity, const char *name);
 
 extern ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const char *names);
 
