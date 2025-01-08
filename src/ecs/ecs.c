@@ -132,6 +132,7 @@ ecs_err_t ecs_create_scene(ecs_scene_t *scene)
 
     nscene.components = calloc(ECS_MAX_COMPONENTS, sizeof(*nscene.components) * ECS_MAX_COMPONENTS);
 
+    nscene.next_entities = 1;
     ret |= nscene.components == NULL;
     ret |= vector_init(&nscene.entities, sizeof(entity_info_t), 1);
     ret |= vector_init(&nscene.recycled_entities, sizeof(ecs_entity_t), 1);
