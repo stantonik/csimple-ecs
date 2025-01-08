@@ -11,17 +11,19 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
 #define ECS_OK 0
 #define ECS_ERR -1
 #define ECS_ERR_NULL 1
 #define ECS_ERR_MEM 2
 #define ECS_ERR_EXISTS 3
 
-#define ECS_CHECK_ERROR(x, format, ...) \
+#define ECS_CHECK_ERROR(tag, x, format, ...) \
     do { \
         int __ret = (x); \
         if (__ret != ECS_OK) { \
-            printf(format"%i\n", ##__VA_ARGS__, __ret); \
+            printf("%s: "format"%i\n", tag, ##__VA_ARGS__, __ret); \
             return __ret; \
         } \
     } while (0)

@@ -48,7 +48,7 @@ typedef int ecs_err_t;
 typedef uint32_t ecs_entity_t;
 typedef uint32_t ecs_scene_t;
 typedef uint32_t ecs_signature_t;
-typedef ecs_err_t (*ecs_system_t)(ecs_entity_t *, int count, void *args);
+typedef ecs_err_t (*ecs_system_t)(ecs_entity_t *, int count, void *args[]);
 
 typedef enum 
 {
@@ -87,7 +87,7 @@ extern ecs_err_t ecs_create_signature_by_names(ecs_signature_t *signature, const
 
 extern ecs_err_t ecs_register_system(ecs_system_t system, ecs_signature_t signature, ecs_system_event_t event);
 extern ecs_err_t ecs_unregister_system(ecs_system_t system);
-extern ecs_err_t ecs_set_system_parameters(ecs_system_t system, void *args);
+extern ecs_err_t ecs_set_system_parameters(ecs_system_t system, int argc, void *args[]);
 extern ecs_err_t ecs_call_system(ecs_system_t system);
 extern ecs_err_t ecs_listen_systems(ecs_system_event_t event);
 extern ecs_err_t ecs_get_system_status(ecs_system_t system, ecs_err_t *ret);

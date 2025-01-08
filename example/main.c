@@ -7,6 +7,8 @@
 #include "ecs/ecs.h"
 #include "ecs/ecs_err.h"
 
+#define TAG "example"
+
 typedef struct
 {
     float x, y, z;
@@ -17,9 +19,9 @@ typedef struct
     float vx, vy, vz;
 } rigidbody_t;
 
-ecs_err_t physics_system(ecs_entity_t *it, int count, void *args)
+ecs_err_t physics_system(ecs_entity_t *it, int count, void *args[])
 {
-    float dt = ((float *)args)[0];
+    float dt = *(float *)args[0];
 
     for (int i = 0; i < count; ++i)
     {
@@ -53,7 +55,7 @@ int main(void)
     ecs_signature_t signature;
     ecs_create_signature(&signature, transform_t, rigidbody_t);
     ret |= ecs_register_system(physics_system, signature, ECS_SYSTEM_ON_UPDATE);
-    ECS_CHECK_ERROR(ret, "Failed to register system : ");
+    ECS_CHECK_ERROR(TAG, ret, "failed to register system : ");
 
     ecs_entity_t player;
     ecs_create_entity(&player);
@@ -65,20 +67,20 @@ int main(void)
     rigidbody_t *rb;
     ret |= ecs_get_component(player, transform_t, &transform);
     ret |= ecs_get_component(player, rigidbody_t, &rb);
-    ECS_CHECK_ERROR(ret, "Failed to get components : ");
+    ECS_CHECK_ERROR(TAG, ret, "failed to get components : ");
 
     float dt = 0.1f;
-    ecs_set_system_parameters(physics_system, &dt);
+    ecs_set_system_parameters(physics_system, 1, (void *[]){ &dt });
+
     // Gameloop
     while (1)
     {
         ecs_listen_systems(ECS_SYSTEM_ON_UPDATE);
         ecs_get_system_status(physics_system, &ret);
-        ECS_CHECK_ERROR(ret, "Error in the system : ");
+        ECS_CHECK_ERROR(TAG, ret, "error in the system : ");
 
         printf("Transform : x=%.2f, y=%.2f, z=%.2f\n",
                 transform->x, transform->y, transform->z);
-        break;
     }
 
     ecs_listen_systems(ECS_SYSTEM_ON_END);

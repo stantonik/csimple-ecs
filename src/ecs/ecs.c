@@ -42,7 +42,7 @@ typedef struct
 typedef struct
 {
     ecs_system_t system;
-    void *args;
+    void **args;
     ecs_err_t status;
 
     ecs_signature_t signature;
@@ -528,6 +528,7 @@ ecs_err_t ecs_unregister_system(ecs_system_t system)
     system_info_t *sys_info;
     vector_get(&cs->systems, sys_info_id, (void **)&sys_info);
 
+    free(sys_info->args);
     vector_free(&sys_info->entities_v);
     set_free(&sys_info->entities_s);
     vector_remove(&cs->systems, sys_info_id);
@@ -539,7 +540,7 @@ ecs_err_t ecs_unregister_system(ecs_system_t system)
     return ECS_OK;
 }
 
-ecs_err_t ecs_set_system_parameters(ecs_system_t system, void *args)
+ecs_err_t ecs_set_system_parameters(ecs_system_t system, int argc, void *argv[])
 {
     int sys_info_id;
     if (!uiptrtoi_map_get(&cs->system_to_index_map, (uintptr_t)system, &sys_info_id))
@@ -550,7 +551,12 @@ ecs_err_t ecs_set_system_parameters(ecs_system_t system, void *args)
     system_info_t *sys_info;
     vector_get(&cs->systems, sys_info_id, (void **)&sys_info);
 
-    sys_info->args = args;
+    sys_info->args = malloc(sizeof(void *) * argc);
+    if (sys_info->args == NULL)
+    {
+        return ECS_ERR_MEM;
+    }
+    memcpy(sys_info->args, argv, sizeof(void *) * argc);
 
     return ECS_OK;
 }
